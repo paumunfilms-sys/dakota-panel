@@ -28,6 +28,8 @@
   .kpi .del { font-size:13px; font-weight:600; margin-top:4px; }
   .sub-kpi { color:var(--mut); font-size:14px; font-weight:600; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
   .sub-kpi b { color:var(--txt); font-family:Anton,sans-serif; font-weight:400; font-size:24px; margin-left:6px; }
+  #equipos h3 { font-size:14px; letter-spacing:.06em; margin:0 0 10px; }
+  .bloque { margin-bottom:18px; }
   .up { color:var(--ok); } .down { color:var(--err); } .flat { color:var(--mut); }
   .grid { display:grid; grid-template-columns:repeat(12,1fr); gap:12px; }
   .card { background:var(--s1); border:1px solid var(--line); border-radius:14px; padding:18px; min-width:0; }
@@ -72,6 +74,8 @@
   </header>
 
   <div class="kpis" id="kpis"></div>
+
+  <div id="equipos"></div>
 
   <div class="grid">
     <div class="card c8"><h3 id="tDias"></h3><div class="alto"><canvas id="gDias"></canvas></div></div>
@@ -178,6 +182,27 @@ function pintar() {
     : '<span style="color:var(--mut)">Sin datos todavía</span>';
 }
 
+// EQUIPOS (Pau, 2026-11-01): en verde los que estan trabajando, cada uno bajo su app, y en rojo
+// los demas. Trabajando = ha mandado datos hace menos de ACTIVO_MIN minutos y no ha cerrado.
+const ACTIVO_MIN = 25;
+function pintarEquipos() {
+  const ultimo = {};
+  FILAS.forEach(r => { const u = ultimo[r.equipo];
+    if (!u || (r.recibido || "") > (u.recibido || "")) ultimo[r.equipo] = r; });
+  const activo = r => !r.cerrada && (AHORA - new Date(r.recibido)) / 60000 < ACTIVO_MIN;
+  const lista = Object.values(ultimo).sort((a, b) => a.equipo < b.equipo ? -1 : 1);
+  const num = (r, k) => r.fecha === hoy && r[k] != null ? r[k].toLocaleString("es-ES") : "–";
+  const ficha = (r, color) => `<div class="eq"><div class="nom"><span class="dot" style="background:var(--${color})"></span>${r.equipo.replace("DK-RM-", "")}</div>
+    <div class="linea">QR<b>${num(r, "visitantes")}</b></div><div class="linea">Disparos<b>${num(r, "disparos")}</b></div>
+    <div class="linea">Fotomontajes<b>${num(r, "fotos_finales")}</b></div>
+    <div class="linea">Disco<b>${r.disco_libre_gb} GB</b></div><div class="linea">Versión<b>${r.version}</b></div></div>`;
+  const bloque = (titulo, f, color) => f.length
+    ? `<div class="bloque"><h3>${titulo}</h3><div class="equipos">${f.map(r => ficha(r, color)).join("")}</div></div>` : "";
+  const app = n => lista.filter(r => activo(r) && (r.app || "FotoJugador") === n);
+  document.getElementById("equipos").innerHTML = bloque("EQUIPOS FOTOJUGADOR", app("FotoJugador"), "ok") +
+    bloque("EQUIPOS FOTOCOPA", app("FotoCopa"), "ok") + bloque("SIN TRABAJAR", lista.filter(r => !activo(r)), "err");
+}
+
 function hacer(id, tipo, data, opciones) {
   if (graficas[id]) graficas[id].destroy();
   graficas[id] = new Chart(document.getElementById(id), { type: tipo, data,
@@ -199,6 +224,7 @@ async function cargar() {
     FILAS = d.filas.filter(x => x.equipo !== MADRE);
     AHORA = new Date(d.ahora); hoy = fmt(AHORA);
     pintar();
+    pintarEquipos();
   } catch (e) {
     if (!FILAS.length) document.getElementById("sub").textContent = "No se han podido leer los datos: revisa el enlace";
   }
