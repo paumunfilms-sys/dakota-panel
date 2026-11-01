@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistemas Dakota · Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root { --bg:#0a0a0d; --s1:#121218; --s2:#181820; --line:#24242e; --txt:#ececf0; --mut:#8c8c98;
+          --coral:#ff6b5b; --coral2:#ff9a8d; --ok:#3ecf8e; --warn:#f5b041; --err:#ff4d4f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font-family:Inter,Segoe UI,sans-serif; }
+  .wrap { max-width:1280px; margin:0 auto; padding:28px 20px 60px; }
+  header { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap;
+           border-top:6px solid var(--coral); padding-top:22px; }
+  h1 { font-family:Anton,sans-serif; font-weight:400; font-size:44px; letter-spacing:.02em; margin:0; line-height:1; }
+  h1 span { color:var(--coral); }
+  .sub { color:var(--mut); font-size:14px; margin-top:6px; }
+  .tabs { display:flex; gap:6px; background:var(--s1); padding:4px; border-radius:10px; border:1px solid var(--line); }
+  .tabs button { background:none; border:0; color:var(--mut); font:600 13px Inter,sans-serif; padding:8px 14px;
+                 border-radius:7px; cursor:pointer; }
+  .tabs button.on { background:var(--coral); color:#fff; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin:26px 0; }
+  .kpi { background:var(--s1); border:1px solid var(--line); border-radius:14px; padding:18px 18px 16px; }
+  .kpi .lab { color:var(--mut); font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; }
+  .kpi .val { font-family:Anton,sans-serif; font-size:42px; line-height:1.1; margin-top:8px; }
+  .kpi .del { font-size:13px; font-weight:600; margin-top:4px; }
+  .sub-kpi { color:var(--mut); font-size:14px; font-weight:600; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
+  .sub-kpi b { color:var(--txt); font-family:Anton,sans-serif; font-weight:400; font-size:24px; margin-left:6px; }
+  .up { color:var(--ok); } .down { color:var(--err); } .flat { color:var(--mut); }
+  .grid { display:grid; grid-template-columns:repeat(12,1fr); gap:12px; }
+  .card { background:var(--s1); border:1px solid var(--line); border-radius:14px; padding:18px; min-width:0; }
+  .card h3 { margin:0 0 14px; font-size:14px; font-weight:700; letter-spacing:.02em; }
+  .card h3 small { color:var(--mut); font-weight:500; margin-left:6px; }
+  .c8 { grid-column:span 8; } .c4 { grid-column:span 4; } .c6 { grid-column:span 6; } .c12 { grid-column:span 12; }
+  @media (max-width:900px) { .c8,.c4,.c6 { grid-column:span 12; } h1 { font-size:34px; } }
+  .alto { height:280px; position:relative; } .medio { height:220px; position:relative; }
+  .equipos { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; }
+  .eq { background:var(--s2); border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .eq .nom { display:flex; align-items:center; gap:8px; font-weight:700; }
+  .dot { width:10px; height:10px; border-radius:50%; flex:none; }
+  .eq .linea { display:flex; justify-content:space-between; color:var(--mut); font-size:13px; margin-top:7px; }
+  .eq .linea b { color:var(--txt); font-weight:600; }
+  .alerta { display:flex; gap:10px; align-items:flex-start; background:#1f1213; border:1px solid #4a2326;
+            border-radius:10px; padding:10px 12px; margin-bottom:8px; font-size:13px; }
+  .todo-ok { color:var(--ok); font-weight:600; font-size:14px; }
+  .top { display:flex; flex-direction:column; gap:8px; }
+  #alertas { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr)); gap:8px; margin-bottom:12px; }
+  .equipos { grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr)) !important; }
+  body { overflow-x:hidden; }
+  @media (max-width:600px) { .wrap { padding:20px 16px 48px; } .tabs { width:100%; } .tabs button { flex:1; padding:8px 4px; }
+    .kpi .val { font-size:34px; } .top .fila { grid-template-columns:90px 1fr 34px; } }
+  #alertas .alerta { margin:0; }
+  .top .fila { display:grid; grid-template-columns:110px 1fr 40px; gap:10px; align-items:center; font-size:13px; }
+  .top .barra { height:12px; border-radius:6px; background:linear-gradient(90deg,var(--coral),var(--coral2)); }
+  .top .fila span:last-child { text-align:right; color:var(--mut); font-variant-numeric:tabular-nums; }
+  footer { color:var(--mut); font-size:12px; margin-top:28px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>SISTEMAS <span>DAKOTA</span> · PANEL</h1>
+      <div class="sub" id="sub"></div>
+    </div>
+    <div class="tabs" id="tabs">
+      <button data-p="hoy" class="on">Hoy</button><button data-p="ayer">Ayer</button>
+      <button data-p="anteayer">Anteayer</button><button data-p="d7">7 días</button><button data-p="d30">30 días</button>
+    </div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid">
+    <div class="card c8"><h3 id="tDias"></h3><div class="alto"><canvas id="gDias"></canvas></div></div>
+    <div class="card c4"><h3>Jugadores más elegidos</h3><div class="top" id="top"></div></div>
+    <div class="card c12"><h3>¿A qué hora viene la gente? <small>QR por hora</small></h3><div class="medio"><canvas id="gHoras"></canvas></div></div>
+  </div>
+  <footer>Datos de cada sistema, enviados cada 10 minutos y al cerrar. Ventas y fotos subidas: PhotoInsight.</footer>
+</div>
+
+<script>
+// Pagina suelta (Pau, 2026-11-01): fuera de Google no sale el aviso de «aplicacion creada por un
+// usuario». Los datos los da la hoja. Direccion y clave van tras la # del enlace, no en este
+// fichero: panel.html#u=<direccion /exec>&k=<CLAVE_PANEL>
+const PARAM = new URLSearchParams(location.hash.slice(1));
+const MADRE = "DK-RM-FJ1";            // la madre no opera: no cuenta
+const COLORES = ["#ff6b5b", "#5bc0ff", "#3ecf8e", "#f5b041", "#b48cff", "#ff8fd1", "#7de0d6"];
+Chart.defaults.color = "#8c8c98"; Chart.defaults.borderColor = "#24242e";
+Chart.defaults.font.family = "Inter, Segoe UI, sans-serif";
+const PERIODOS = { hoy: [0, 1], ayer: [1, 1], anteayer: [2, 1], d7: [0, 7], d30: [0, 30] };
+
+let FILAS = [], AHORA = new Date(), hoy = "", periodo = "hoy";
+const dos = n => String(n).padStart(2, "0");
+const fmt = d => `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;   // dia de aqui, no UTC
+const atras = n => { const d = new Date(AHORA); d.setDate(d.getDate() - n); return fmt(d); };
+const nombre = r => r.equipo.replace("DK-RM-", "") + " · " + (r.app || "FotoJugador");
+const suma = (f, k) => f.reduce((a, r) => a + (r[k] || 0), 0);
+const media = v => v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+const graficas = {};
+
+// lo acumulado en las horas ya terminadas: `hora` = la hora en curso
+const hastaHora = (f, k, hora) => f.reduce((a, r) => a + Object.entries(r[k] || {})
+  .reduce((s, [h, n]) => s + (+h < hora ? n : 0), 0), 0);
+
+function comparar(a, b, texto, aprox) {
+  if (!b) return '<span class="flat">—</span>';
+  const p = Math.round(100 * (a - b) / b);
+  return `<span class="${p > 0 ? "up" : p < 0 ? "down" : "flat"}">${p > 0 ? "▲" : p < 0 ? "▼" : "="} ${aprox ? "≈ " : ""}${Math.abs(p)} % ${texto}</span>`;
+}
+
+function pintar() {
+  const [desde0, n] = PERIODOS[periodo];
+  const rango = [...Array(n)].map((_, i) => atras(desde0 + n - 1 - i));
+  const f = FILAS.filter(r => r.fecha >= rango[0] && r.fecha <= rango[n - 1]);
+  const prev = FILAS.filter(r => r.fecha >= atras(desde0 + 2 * n - 1) && r.fecha < rango[0]);
+  const equipos = [...new Set(FILAS.map(nombre))].sort();
+  document.getElementById("sub").textContent =
+    `${equipos.length} sistemas · actualizado ${AHORA.toLocaleString("es-ES", {dateStyle: "long", timeStyle: "short"})}`;
+
+  const v = suma(f, "visitantes"), fo = suma(f, "fotos_finales");
+  let dV, dF;
+  if (periodo === "hoy") {
+    // HOY contra AYER a la misma hora: solo horas terminadas, las dos partes igual
+    const h = AHORA.getHours(), texto = `vs ayer hasta las ${h}:00`;
+    const hv = hastaHora(f, "por_hora", h), pv = hastaHora(prev, "por_hora", h);
+    dV = comparar(hv, pv, texto);
+    if (prev.length && prev.every(r => r.fotos_por_hora)) {
+      dF = comparar(hastaHora(f, "fotos_por_hora", h), hastaHora(prev, "fotos_por_hora", h), texto);
+    } else {
+      // dias enviados antes de existir fotos_por_hora: se reparten como los QR de esa hora
+      const parte = (x, g) => x * (suma(g, "visitantes") ? hastaHora(g, "por_hora", h) / suma(g, "visitantes") : 0);
+      dF = comparar(parte(fo, f), parte(suma(prev, "fotos_finales"), prev), texto, true);
+    }
+  } else {
+    const texto = n === 1 ? "vs día anterior" : "vs periodo anterior";
+    dV = comparar(v, suma(prev, "visitantes"), texto);
+    dF = comparar(fo, suma(prev, "fotos_finales"), texto);
+  }
+  const jpv = media(f.filter(r => r.jugadores_por_visitante).map(r => r.jugadores_por_visitante));
+  const cel = media(f.filter(r => r.celebracion_pct != null).map(r => r.celebracion_pct));
+  const inc = f.reduce((a, r) => a + r.disparos_fallidos + r.reinicios_app + r.webcam_sin_senal + r.render_caidas + r.render_errores, 0);
+  // los dias anteriores al 01-11 no traen disparos
+  const conDisparos = f.filter(r => r.disparos != null);
+  const disparos = `<div class="sub-kpi">Disparos <b>${conDisparos.length ? suma(conDisparos, "disparos").toLocaleString("es-ES") : "–"}</b></div>`;
+  const kpi = (lab, val, del) => `<div class="kpi"><div class="lab">${lab}</div><div class="val">${val}</div><div class="del">${del || "&nbsp;"}</div></div>`;
+  document.getElementById("kpis").innerHTML =
+    kpi("QR escaneados", v.toLocaleString("es-ES"), dV) + kpi("Fotomontajes", fo.toLocaleString("es-ES"), dF + disparos) +
+    kpi("Jugadores por QR", jpv == null ? "–" : jpv.toFixed(1).replace(".", ","), "") +
+    kpi("Hacen celebración", cel == null ? "–" : Math.round(cel) + " %", "") +
+    kpi("Incidencias", inc, "");
+
+  // QR por dia, apilado por sistema; en un dia suelto, por sistema
+  document.getElementById("tDias").innerHTML = n === 1 ? "QR escaneados <small>por sistema</small>" : "QR escaneados por día <small>por sistema</small>";
+  hacer("gDias", "bar", {
+    labels: n === 1 ? ["Total"] : rango.map(d => new Date(d + "T12:00").toLocaleDateString("es-ES", {day: "numeric", month: "short"})),
+    datasets: equipos.map((e, i) => ({ label: e, backgroundColor: COLORES[i % COLORES.length], borderRadius: 4,
+      data: rango.map(x => suma(f.filter(r => nombre(r) === e && r.fecha === x), "visitantes")) })).filter(d => d.data.some(x => x))
+  }, { scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true } } });
+
+  // por hora
+  const horas = [...Array(14)].map((_, i) => dos(i + 8));
+  const ph = horas.map(h => f.reduce((a, r) => a + ((r.por_hora || {})[h] || 0), 0) / (n === 1 ? 1 : Math.max(1, new Set(f.filter(r => r.visitantes).map(r => r.fecha)).size)));
+  const max = Math.max(...ph);
+  hacer("gHoras", "bar", { labels: horas.map(h => h + "h"),
+    datasets: [{ label: n === 1 ? "QR" : "Media por día", data: ph.map(x => Math.round(x * 10) / 10), borderRadius: 5,
+                 backgroundColor: ph.map(x => x === max && x > 0 ? "#ff6b5b" : "#3a3a48") }] },
+    { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true } } });
+
+  // top jugadores
+  const top = {};
+  f.forEach(r => (r.top_jugadores || []).forEach(([nom, c]) => top[nom] = (top[nom] || 0) + c));
+  const lista = Object.entries(top).sort((a, b) => b[1] - a[1]).slice(0, 10), mx = lista.length ? lista[0][1] : 1;
+  document.getElementById("top").innerHTML = lista.length ? lista.map(([nom, c]) =>
+    `<div class="fila"><span>${nom}</span><div class="barra" style="width:${Math.max(4, 100 * c / mx)}%"></div><span>${c}</span></div>`).join("")
+    : '<span style="color:var(--mut)">Sin datos todavía</span>';
+}
+
+function hacer(id, tipo, data, opciones) {
+  if (graficas[id]) graficas[id].destroy();
+  graficas[id] = new Chart(document.getElementById(id), { type: tipo, data,
+    options: Object.assign({ responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 10, boxHeight: 10 } } } }, opciones) });
+}
+
+document.getElementById("tabs").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b));
+  periodo = b.dataset.p;
+  pintar();
+});
+
+async function cargar() {
+  try {
+    const r = await fetch(`${PARAM.get("u")}?k=${encodeURIComponent(PARAM.get("k") || "")}&formato=json`);
+    const d = await r.json();
+    FILAS = d.filas.filter(x => x.equipo !== MADRE);
+    AHORA = new Date(d.ahora); hoy = fmt(AHORA);
+    pintar();
+  } catch (e) {
+    if (!FILAS.length) document.getElementById("sub").textContent = "No se han podido leer los datos: revisa el enlace";
+  }
+}
+cargar();
+setInterval(cargar, 5 * 60 * 1000);       // los equipos mandan cada 10 minutos
+</script>
+</body>
+</html>
