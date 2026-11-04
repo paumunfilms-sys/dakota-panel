@@ -28,6 +28,14 @@
   .kpi .del { font-size:13px; font-weight:600; margin-top:4px; }
   .sub-kpi { color:var(--mut); font-size:14px; font-weight:600; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
   .sub-kpi b { color:var(--txt); font-family:Anton,sans-serif; font-weight:400; font-size:24px; margin-left:6px; }
+  .seccion { margin:26px 0 8px; }
+  .seccion h2 { font-family:Anton,sans-serif; font-weight:400; font-size:24px; letter-spacing:.04em; margin:0 0 10px; }
+  .seccion h2 em { font-style:normal; color:var(--coral); }
+  .seccion h2 span { color:var(--mut); font-family:Inter,sans-serif; font-size:13px; font-weight:500; letter-spacing:0; margin-left:8px; }
+  .seccion .kpis { margin:0; }
+  .seccion.total .kpi { border-color:var(--coral); }
+  .kpi .nota { color:var(--mut); font-size:12px; margin-top:6px; }
+  #equipos { margin-top:26px; }
   #equipos h3 { font-size:14px; letter-spacing:.06em; margin:0 0 10px; }
   .bloque { margin-bottom:18px; }
   .up { color:var(--ok); } .down { color:var(--err); } .flat { color:var(--mut); }
@@ -73,14 +81,14 @@
     </div>
   </header>
 
-  <div class="kpis" id="kpis"></div>
+  <div id="kpis"></div>
 
   <div id="equipos"></div>
 
   <div class="grid">
     <div class="card c8"><h3 id="tDias"></h3><div class="alto"><canvas id="gDias"></canvas></div></div>
     <div class="card c4"><h3>Jugadores más elegidos</h3><div class="top" id="top"></div></div>
-    <div class="card c12"><h3>Flujo de usuarios <small>QR por hora</small></h3><div class="medio"><canvas id="gHoras"></canvas></div></div>
+    <div class="card c12"><h3>Flujo de usuarios <small>usuarios por hora</small></h3><div class="medio"><canvas id="gHoras"></canvas></div></div>
   </div>
   <footer>Datos de cada sistema, enviados cada 10 minutos y al cerrar.</footer>
 </div>
@@ -104,6 +112,7 @@ const nombre = r => r.equipo.replace("DK-RM-", "") + " · " + (r.app || "FotoJug
 const suma = (f, k) => f.reduce((a, r) => a + (r[k] || 0), 0);
 const media = v => v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
 const graficas = {};
+const MIL = new Intl.NumberFormat("es-ES", { useGrouping: "always" });   // 2.962, no 2962
 
 // lo acumulado en las horas ya terminadas: `hora` = la hora en curso
 const hastaHora = (f, k, hora) => f.reduce((a, r) => a + Object.entries(r[k] || {})
@@ -124,44 +133,68 @@ function pintar() {
   document.getElementById("sub").textContent =
     `${equipos.length} sistemas · actualizado ${AHORA.toLocaleString("es-ES", {dateStyle: "long", timeStyle: "short"})}`;
 
-  const v = suma(f, "visitantes"), fo = suma(f, "fotos_finales");
-  let dV, dF;
-  if (periodo === "hoy") {
-    // HOY contra AYER a la misma hora: solo horas terminadas, las dos partes igual
+  // CUADRO DE YURI (04-11): PHOTOPLAYER (= FotoJugador), COPA y TOTAL
+  const esCopa = r => r.app === "FotoCopa";
+  const fj = f.filter(r => !esCopa(r)), fc = f.filter(esCopa);
+  const pj = prev.filter(r => !esCopa(r)), pc = prev.filter(esCopa);
+  const es = x => x == null ? "–" : MIL.format(x);
+  const coma = x => x == null ? "–" : x.toFixed(1).replace(".", ",");
+  // comparacion: HOY contra AYER hasta la misma hora (solo horas terminadas); si no, el periodo anterior
+  function delta(g, gp, k, kHora) {
+    if (periodo !== "hoy") return comparar(suma(g, k), suma(gp, k), n === 1 ? "vs día anterior" : "vs periodo anterior");
     const h = AHORA.getHours(), texto = `vs ayer hasta las ${h}:00`;
-    const hv = hastaHora(f, "por_hora", h), pv = hastaHora(prev, "por_hora", h);
-    dV = comparar(hv, pv, texto);
-    if (prev.length && prev.every(r => r.fotos_por_hora)) {
-      dF = comparar(hastaHora(f, "fotos_por_hora", h), hastaHora(prev, "fotos_por_hora", h), texto);
-    } else {
-      // dias enviados antes de existir fotos_por_hora: se reparten como los QR de esa hora
-      const parte = (x, g) => x * (suma(g, "visitantes") ? hastaHora(g, "por_hora", h) / suma(g, "visitantes") : 0);
-      dF = comparar(parte(fo, f), parte(suma(prev, "fotos_finales"), prev), texto, true);
-    }
-  } else {
-    const texto = n === 1 ? "vs día anterior" : "vs periodo anterior";
-    dV = comparar(v, suma(prev, "visitantes"), texto);
-    dF = comparar(fo, suma(prev, "fotos_finales"), texto);
+    if (kHora === "por_hora" || kHora === "_qrh") return comparar(hastaHora(g, "por_hora", h), hastaHora(gp, "por_hora", h), texto);
+    if (kHora && gp.length && gp.every(r => r[kHora])) return comparar(hastaHora(g, kHora, h), hastaHora(gp, kHora, h), texto);
+    return "";
   }
-  const jpv = media(f.filter(r => r.jugadores_por_visitante).map(r => r.jugadores_por_visitante));
-  const cel = media(f.filter(r => r.celebracion_pct != null).map(r => r.celebracion_pct));
-  const inc = f.reduce((a, r) => a + r.disparos_fallidos + r.reinicios_app + r.webcam_sin_senal + r.render_caidas + r.render_errores, 0);
-  // los dias anteriores al 01-11 no traen disparos
-  const conDisparos = f.filter(r => r.disparos != null);
-  const disparos = `<div class="sub-kpi">Disparos <b>${conDisparos.length ? suma(conDisparos, "disparos").toLocaleString("es-ES") : "–"}</b></div>`;
-  const kpi = (lab, val, del) => `<div class="kpi"><div class="lab">${lab}</div><div class="val">${val}</div><div class="del">${del || "&nbsp;"}</div></div>`;
+  // los dias anteriores al 01-11 no traen shots; los anteriores al 05-11, el reparto de composiciones
+  const sumaSi = (g, k) => { const c = g.filter(r => r[k] != null); return c.length ? suma(c, k) : null; };
+  const kpi = (lab, val, del, nota) => `<div class="kpi"><div class="lab">${lab}</div><div class="val">${val}</div><div class="del">${del || "&nbsp;"}</div>${nota ? `<div class="nota">${nota}</div>` : ""}</div>`;
+  const seccion = (titulo, extra, cls, html) => `<div class="seccion ${cls}"><h2>${titulo}<span>${extra}</span></h2><div class="kpis">${html}</div></div>`;
+
+  // QR (tarjetas) y USUARIOS FINALES (QR + usuarios añadidos con el mismo QR): los informes de antes
+  // de la 0.2.19 solo traen "visitantes", que eran usuarios; ahi QR = usuarios (Pau, 04-11)
+  f.concat(prev).forEach(r => {
+    r._qr = r.qr_escaneados ?? r.visitantes ?? 0; r._usu = r.usuarios_finales ?? r.visitantes ?? 0;
+    r._qrh = r.qr_por_hora || r.por_hora;
+    r._usuAle = r.usuarios_alegrias ?? Math.round((r.celebracion_pct || 0) * (r.visitantes || 0) / 100);
+  });
+  const porUsu = (g, k) => { const c = g.filter(r => r[k] != null && r._usu); return c.length && suma(c, "_usu") ? suma(c, k) / suma(c, "_usu") : null; };
+  const qrJ = suma(fj, "_qr"), usuJ = suma(fj, "_usu"), cJ = suma(fj, "fotos_finales");
+  const cJug = sumaSi(fj, "composiciones_jugadores"), cAle = sumaSi(fj, "composiciones_alegrias");
+  const jpu = porUsu(fj, "composiciones_jugadores") ?? media(fj.filter(r => r.jugadores_por_visitante).map(r => r.jugadores_por_visitante));
+  const usuAle = suma(fj, "_usuAle"), aprox = fj.some(r => r.usuarios_alegrias == null) ? "≈ " : "";
+  const reparto = cJug == null ? "" : `Jugadores ${es(cJug)} · Alegrías ${es(cAle)} · Escenarios –`;
+  const qrC = suma(fc, "_qr"), cC = suma(fc, "fotos_finales");
+  const sJ = sumaSi(fj, "disparos"), sC = sumaSi(fc, "disparos");
+  const sT = sJ == null && sC == null ? null : (sJ || 0) + (sC || 0);
+
   document.getElementById("kpis").innerHTML =
-    kpi("QR escaneados", v.toLocaleString("es-ES"), dV) + kpi("Fotomontajes", fo.toLocaleString("es-ES"), dF + disparos) +
-    kpi("Jugadores por QR", jpv == null ? "–" : jpv.toFixed(1).replace(".", ","), "") +
-    kpi("Hacen celebración", cel == null ? "–" : Math.round(cel) + " %", "") +
-    kpi("Incidencias", inc, "");
+    seccion("PHOTO<em>PLAYER</em>", "", "",
+      kpi("QR escaneados", es(qrJ), delta(fj, pj, "_qr", "_qrh")) +
+      kpi("Usuarios finales", es(usuJ), delta(fj, pj, "_usu", "por_hora"), "QR + usuarios añadidos") +
+      kpi("Composiciones", es(cJ), delta(fj, pj, "fotos_finales", "fotos_por_hora"), reparto) +
+      kpi("Shots", es(sJ), periodo === "hoy" ? "" : delta(fj, pj, "disparos")) +
+      kpi("Jugadores por usuario", coma(jpu), "") +
+      kpi("Alegrías por usuario", coma(porUsu(fj, "composiciones_alegrias")), "") +
+      kpi("Escenarios por usuario", "–", "", "Aún no hay escenarios en la app") +
+      kpi("Usuarios que hacen alegrías", aprox + es(usuAle), usuJ ? `<span class="flat">${aprox}${Math.round(100 * usuAle / usuJ)} % de los usuarios</span>` : "")) +
+    seccion("PHOTO<em>COPA</em>", "", "",
+      kpi("QR escaneados", es(qrC), delta(fc, pc, "_qr", "_qrh")) +
+      kpi("Composiciones", es(cC), delta(fc, pc, "fotos_finales", "fotos_por_hora")) +
+      kpi("Shots", es(sC), periodo === "hoy" ? "" : delta(fc, pc, "disparos"))) +
+    seccion("TOTAL", "PhotoPlayer + PhotoCopa", "total",
+      kpi("QR escaneados", es(qrJ + qrC), delta(f, prev, "_qr", "_qrh")) +
+      kpi("Usuarios finales", es(usuJ + qrC), delta(f, prev, "_usu", "por_hora")) +
+      kpi("Composiciones", es(cJ + cC), delta(f, prev, "fotos_finales", "fotos_por_hora"), "Jugadores + alegrías + escenarios + Copa") +
+      kpi("Shots", es(sT), periodo === "hoy" ? "" : delta(f, prev, "disparos")));
 
   // QR por dia, apilado por sistema; en un dia suelto, por sistema
   document.getElementById("tDias").innerHTML = n === 1 ? "QR escaneados <small>por sistema</small>" : "QR escaneados por día <small>por sistema</small>";
   hacer("gDias", "bar", {
     labels: n === 1 ? ["Total"] : rango.map(d => new Date(d + "T12:00").toLocaleDateString("es-ES", {day: "numeric", month: "short"})),
     datasets: equipos.map((e, i) => ({ label: e, backgroundColor: COLORES[i % COLORES.length], borderRadius: 4,
-      data: rango.map(x => suma(f.filter(r => nombre(r) === e && r.fecha === x), "visitantes")) })).filter(d => d.data.some(x => x))
+      data: rango.map(x => suma(f.filter(r => nombre(r) === e && r.fecha === x), "_qr")) })).filter(d => d.data.some(x => x))
   }, { scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true } } });
 
   // por hora
@@ -169,7 +202,7 @@ function pintar() {
   const ph = horas.map(h => f.reduce((a, r) => a + ((r.por_hora || {})[h] || 0), 0) / (n === 1 ? 1 : Math.max(1, new Set(f.filter(r => r.visitantes).map(r => r.fecha)).size)));
   const max = Math.max(...ph);
   hacer("gHoras", "bar", { labels: horas.map(h => h + "h"),
-    datasets: [{ label: n === 1 ? "QR" : "Media por día", data: ph.map(x => Math.round(x * 10) / 10), borderRadius: 5,
+    datasets: [{ label: n === 1 ? "Usuarios" : "Media por día", data: ph.map(x => Math.round(x * 10) / 10), borderRadius: 5,
                  backgroundColor: ph.map(x => x === max && x > 0 ? "#ff6b5b" : "#3a3a48") }] },
     { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true } } });
 
@@ -193,14 +226,14 @@ function pintarEquipos() {
   const lista = Object.values(ultimo).sort((a, b) => a.equipo < b.equipo ? -1 : 1);
   const num = (r, k) => r.fecha === hoy && r[k] != null ? r[k].toLocaleString("es-ES") : "–";
   const ficha = (r, color) => `<div class="eq"><div class="nom"><span class="dot" style="background:var(--${color})"></span>${r.equipo.replace("DK-RM-", "")}</div>
-    <div class="linea">QR<b>${num(r, "visitantes")}</b></div><div class="linea">Disparos<b>${num(r, "disparos")}</b></div>
-    <div class="linea">Fotomontajes<b>${num(r, "fotos_finales")}</b></div>
+    <div class="linea">QR<b>${num(r, "visitantes")}</b></div><div class="linea">Shots<b>${num(r, "disparos")}</b></div>
+    <div class="linea">Composiciones<b>${num(r, "fotos_finales")}</b></div>
     <div class="linea">Disco<b>${r.disco_libre_gb} GB</b></div><div class="linea">Versión<b>${r.version}</b></div></div>`;
   const bloque = (titulo, f, color) => f.length
     ? `<div class="bloque"><h3>${titulo}</h3><div class="equipos">${f.map(r => ficha(r, color)).join("")}</div></div>` : "";
   const app = n => lista.filter(r => activo(r) && (r.app || "FotoJugador") === n);
-  document.getElementById("equipos").innerHTML = bloque("EQUIPOS FOTOJUGADOR", app("FotoJugador"), "ok") +
-    bloque("EQUIPOS FOTOCOPA", app("FotoCopa"), "ok") + bloque("SIN TRABAJAR", lista.filter(r => !activo(r)), "err");
+  document.getElementById("equipos").innerHTML = bloque("EQUIPOS PHOTOPLAYER", app("FotoJugador"), "ok") +
+    bloque("EQUIPOS COPA", app("FotoCopa"), "ok") + bloque("SIN TRABAJAR", lista.filter(r => !activo(r)), "err");
 }
 
 function hacer(id, tipo, data, opciones) {
