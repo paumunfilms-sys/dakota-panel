@@ -1,0 +1,33 @@
+# Publica el panel nuevo (rama panel-nuevo) el 04-11-2026 a las 17:30 de Madrid (16:30 UTC),
+# aunque los portatiles esten apagados. Tambien se puede lanzar a mano desde Actions.
+name: Publicar panel nuevo
+on:
+  schedule:
+    - cron: "30 16 4 11 *"
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Copiar el panel nuevo
+        run: |
+          # el cron vuelve cada 4 de noviembre: solo vale el de 2026
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$(date -u +%Y)" != "2026" ]; then exit 0; fi
+          git checkout origin/panel-nuevo -- index.html
+          git config user.name "dakota-panel"
+          git config user.email "dakota-panel@users.noreply.github.com"
+          if git diff --cached --quiet; then echo "ya estaba publicado"; exit 0; fi
+          git commit -m "Panel nuevo: cuadro de Yuri (Photoplayer, Photocopa, Total)"
+          git push origin main
+      - name: Pedir a GitHub Pages que lo publique
+        run: |
+          curl -s -X POST -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/pages/builds || true
