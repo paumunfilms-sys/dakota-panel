@@ -173,7 +173,13 @@ function pintar() {
   const { rango, etiqueta } = periodoActual();
   const n = rango.length;
   const f = FILAS.filter(r => r.fecha >= rango[0] && r.fecha <= rango[n - 1]);
-  const prev = FILAS.filter(r => r.fecha >= diaMas(rango[0], -n) && r.fecha < rango[0]);
+  // un dia suelto se compara con el ULTIMO DIA QUE SE OPERO antes (Pau, 09-11: el lunes, con el jueves
+  // si vie-dom no se trabajo); un periodo, con los mismos dias justo antes
+  const diaAnt = n === 1 ? FILAS.filter(r => r.fecha < rango[0] && (r.visitantes || 0) > 0)
+    .reduce((a, r) => r.fecha > a ? r.fecha : a, "") : "";
+  const prev = n === 1 ? FILAS.filter(r => r.fecha === diaAnt)
+    : FILAS.filter(r => r.fecha >= diaMas(rango[0], -n) && r.fecha < rango[0]);
+  const vsDia = diaAnt ? new Date(diaAnt + "T12:00").toLocaleDateString("es-ES", {weekday: "short", day: "numeric", month: "short"}) : "";
   const equipos = [...new Set(FILAS.map(nombre))].sort();
   document.getElementById("sub").textContent =
     `${equipos.length} sistemas · actualizado ${AHORA.toLocaleString("es-ES", {dateStyle: "long", timeStyle: "short"})}`;
@@ -186,8 +192,9 @@ function pintar() {
   const coma = x => x == null ? "–" : x.toFixed(1).replace(".", ",");
   // comparacion: HOY contra AYER hasta la misma hora (solo horas terminadas); si no, el periodo anterior
   function delta(g, gp, k, kHora) {
-    if (periodo !== "hoy") return comparar(suma(g, k), suma(gp, k), n === 1 ? "vs día anterior" : "vs periodo anterior");
-    const h = AHORA.getHours(), texto = `vs ayer hasta las ${h}:00`;
+    if (n === 1 && !suma(f, "visitantes")) return '<span class="flat">sin actividad</span>';
+    if (periodo !== "hoy") return comparar(suma(g, k), suma(gp, k), n === 1 ? `vs ${vsDia}` : "vs periodo anterior");
+    const h = AHORA.getHours(), texto = `vs ${vsDia} hasta las ${h}:00`;
     if (kHora === "por_hora" || kHora === "_qrh") return comparar(hastaHora(g, "por_hora", h), hastaHora(gp, "por_hora", h), texto);
     if (kHora && gp.length && gp.every(r => r[kHora])) return comparar(hastaHora(g, kHora, h), hastaHora(gp, kHora, h), texto);
     return "";
@@ -215,18 +222,17 @@ function pintar() {
   const sT = sJ == null && sC == null ? null : (sJ || 0) + (sC || 0);
 
   ULTIMO = { etiqueta, desde: rango[0], hasta: rango[n - 1], filas: f, resumen: [
-    ["PHOTOPLAYER", "QR escaneados", qrJ], ["PHOTOPLAYER", "Usuarios finales", usuJ], ["PHOTOPLAYER", "Fotos finales", cJ],
+    ["PHOTOPLAYER", "QR escaneados", qrJ], ["PHOTOPLAYER", "Fotos finales", cJ],
     ["PHOTOPLAYER", "Fotos finales de jugadores", cJug], ["PHOTOPLAYER", "Fotos finales de alegrías", cAle],
     ["PHOTOPLAYER", "Shots", sJ], ["PHOTOPLAYER", "Jugadores por usuario", jpu && +jpu.toFixed(2)],
     ["PHOTOPLAYER", "Alegrías por usuario", porUsu(fj, "composiciones_alegrias") && +porUsu(fj, "composiciones_alegrias").toFixed(2)],
     ["PHOTOPLAYER", "Usuarios que hacen alegrías", usuAle],
     ["PHOTOCOPA", "QR escaneados", qrC], ["PHOTOCOPA", "Fotos finales", cC], ["PHOTOCOPA", "Shots", sC],
-    ["TOTAL", "QR escaneados", qrJ + qrC], ["TOTAL", "Usuarios finales", usuJ + qrC], ["TOTAL", "Fotos finales", cJ + cC], ["TOTAL", "Shots", sT]] };
+    ["TOTAL", "QR escaneados", qrJ + qrC], ["TOTAL", "Fotos finales", cJ + cC], ["TOTAL", "Shots", sT]] };
   document.getElementById("bExcel").textContent = `Descargar Excel · ${etiqueta}`;
   document.getElementById("kpis").innerHTML =
     seccion("PHOTO<em>PLAYER</em>", "", "",
       kpi("QR escaneados", es(qrJ), delta(fj, pj, "_qr", "_qrh")) +
-      kpi("Usuarios finales", es(usuJ), delta(fj, pj, "_usu", "por_hora"), "QR + usuarios añadidos") +
       kpi("Fotos finales", es(cJ), delta(fj, pj, "fotos_finales", "fotos_por_hora"), reparto) +
       kpi("Shots", es(sJ), periodo === "hoy" ? "" : delta(fj, pj, "disparos")) +
       kpi("Jugadores por usuario", coma(jpu), "") +
@@ -239,7 +245,6 @@ function pintar() {
       kpi("Shots", es(sC), periodo === "hoy" ? "" : delta(fc, pc, "disparos"))) +
     seccion("TOTAL", "PhotoPlayer + PhotoCopa", "total",
       kpi("QR escaneados", es(qrJ + qrC), delta(f, prev, "_qr", "_qrh")) +
-      kpi("Usuarios finales", es(usuJ + qrC), delta(f, prev, "_usu", "por_hora")) +
       kpi("Fotos finales", es(cJ + cC), delta(f, prev, "fotos_finales", "fotos_por_hora"), "Jugadores + alegrías + escenarios + Copa") +
       kpi("Shots", es(sT), periodo === "hoy" ? "" : delta(f, prev, "disparos")));
 
@@ -358,7 +363,7 @@ document.getElementById("bExcel").addEventListener("click", () => {
   const res = XLSX.utils.aoa_to_sheet([...cab, ["Sección", "Dato", "Valor"], ...resumen.map(([s, d, v]) => [s, d, v ?? ""])]);
   res["!cols"] = [{ wch: 14 }, { wch: 32 }, { wch: 12 }];
   XLSX.utils.book_append_sheet(libro, res, "Resumen");
-  const cols = [["Fecha", "fecha"], ["Equipo", "equipo"], ["App", "app"], ["QR escaneados", "_qr"], ["Usuarios finales", "_usu"],
+  const cols = [["Fecha", "fecha"], ["Equipo", "equipo"], ["App", "app"], ["QR escaneados", "_qr"],
     ["Fotos finales", "fotos_finales"], ["Fotos de jugadores", "composiciones_jugadores"], ["Fotos de alegrías", "composiciones_alegrias"],
     ["Shots", "disparos"], ["Usuarios con alegría", "usuarios_alegrias"], ["Hora punta", "hora_punta"], ["Primera foto", "primera"],
     ["Última foto", "ultima"], ["Foto final media (s)", "foto_final_s"], ["Versión", "version"]];
