@@ -22,6 +22,9 @@
   .tabs button { background:none; border:0; color:var(--mut); font:600 13px Inter,sans-serif; padding:8px 14px;
                  border-radius:7px; cursor:pointer; }
   .tabs button.on { background:var(--coral); color:#fff; }
+  .aviso-datos { margin:26px 0 -10px; padding:14px 18px; border-radius:12px; border:1px solid var(--err);
+    background:color-mix(in srgb, var(--err) 14%, transparent); color:var(--txt); font-size:14px; line-height:1.5; }
+  .aviso-datos b { color:var(--err); display:block; margin-bottom:4px; }
   .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin:26px 0; }
   .kpi { background:var(--s1); border:1px solid var(--line); border-radius:14px; padding:18px 18px 16px; }
   .kpi .lab { color:var(--mut); font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; }
@@ -230,7 +233,12 @@ function pintar() {
     ["PHOTOCOPA", "QR escaneados", qrC], ["PHOTOCOPA", "Fotos finales", cC], ["PHOTOCOPA", "Shots", sC],
     ["TOTAL", "QR escaneados", qrJ + qrC], ["TOTAL", "Fotos finales", cJ + cC], ["TOTAL", "Shots", sT]] };
   document.getElementById("bExcel").textContent = `Descargar Excel · ${etiqueta}`;
-  document.getElementById("kpis").innerHTML =
+  // AVISO DE DATOS INCOMPLETOS (Pau, 16-11): si a un equipo le falta un trozo de registro ese dia,
+  // sus cifras no son de fiar y se dice aqui, en rojo, en vez de descubrirlo dias despues
+  const avisos = f.filter(r => r.aviso_registro);
+  const avisoHtml = avisos.length ? `<div class="aviso-datos"><b>Datos incompletos: estas cifras pueden estar por debajo de lo real.</b>` +
+    avisos.map(r => `<div>${r.equipo.replace("DK-RM-", "")} · ${r.app || "FotoJugador"} · ${r.fecha.split("-").reverse().join("-")}: ${r.aviso_registro}</div>`).join("") + `</div>` : "";
+  document.getElementById("kpis").innerHTML = avisoHtml +
     seccion("PHOTO<em>PLAYER</em>", "", "",
       kpi("QR escaneados", es(qrJ), delta(fj, pj, "_qr", "_qrh")) +
       kpi("Fotos finales", es(cJ), delta(fj, pj, "fotos_finales", "fotos_por_hora"), reparto) +
@@ -291,7 +299,8 @@ function pintarEquipos() {
     <div class="linea">QR<b>${num(r, "visitantes")}</b></div><div class="linea">Shots<b>${num(r, "disparos")}</b></div>
     <div class="linea">Fotos finales<b>${num(r, "fotos_finales")}</b></div>
     ${ahora(r, "foto_final_ahora_s", "Foto final ahora")}${ahora(r, "photoserver_retraso_s", "Retraso PhotoServer")}
-    <div class="linea">Disco<b>${r.disco_libre_gb} GB</b></div><div class="linea">Versión<b>${r.version}</b></div></div>`;
+    <div class="linea">Disco<b>${r.disco_libre_gb} GB</b></div><div class="linea">Versión<b>${r.version}</b></div>
+    ${r.fecha === hoy && r.aviso_registro ? `<div class="linea" style="color:var(--err)">Datos incompletos</div>` : ""}</div>`;
   const bloque = (titulo, f, color) => f.length
     ? `<div class="bloque"><h3>${titulo}</h3><div class="equipos">${f.map(r => ficha(r, color)).join("")}</div></div>` : "";
   const app = n => lista.filter(r => activo(r) && (r.app || "FotoJugador") === n);
