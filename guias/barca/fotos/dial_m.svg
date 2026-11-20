@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220" font-family="Segoe UI, Arial, sans-serif">
+  <!-- Esquema del dial de modos visto desde arriba, con la marca a la IZQUIERDA como en la
+       R10: la M tiene que quedar en la marca. Dibujo propio y simplificado. -->
+  <rect width="320" height="220" rx="14" fill="#15151b"/>
+  <!-- marca blanca fija, a la izquierda -->
+  <polygon points="72,110 54,100 54,120" fill="#ffffff"/>
+  <text x="30" y="142" fill="#ffffff" font-size="13">marca</text>
+  <!-- rueda -->
+  <circle cx="170" cy="110" r="84" fill="#2c2c36" stroke="#4a4a58" stroke-width="3"/>
+  <circle cx="170" cy="110" r="66" fill="none" stroke="#3a3a46" stroke-width="1" stroke-dasharray="3 5"/>
+  <!-- M a la izquierda, resaltada -->
+  <circle cx="106" cy="110" r="19" fill="#f3633f"/>
+  <text x="106" y="118" fill="#ffffff" font-size="22" font-weight="bold" text-anchor="middle">M</text>
+  <!-- resto de modos alrededor -->
+  <g fill="#c9c9d4" font-size="15" font-weight="bold" text-anchor="middle">
+    <text x="124" y="66">Av</text>
+    <text x="170" y="48">Tv</text>
+    <text x="216" y="66">P</text>
+    <text x="236" y="115">Fv</text>
+    <text x="216" y="164">A+</text>
+    <text x="124" y="164">C</text>
+    <text x="170" y="182" font-size="13">vídeo</text>
+  </g>
+</svg>
